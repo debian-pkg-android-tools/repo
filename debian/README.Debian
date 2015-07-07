@@ -1,0 +1,8 @@
+repo for Debian
+---------------
+
+In the standard installation, repo automatically downloads updates using git
+and stores the python files in a dot dir in $HOME.  This package removes that
+functionality so that updates only come from Debian.
+
+ -- Hans-Christoph Steiner <hans@eds.org>, Mon,  6 Jul 2015 23:37:26 -0700
