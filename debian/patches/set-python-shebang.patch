@@ -1,0 +1,14 @@
+From: Hans-Christoph Steiner <hans@eds.org>
+Subject: manually set python shebang
+Description:
+ Since this isn't really a standard python package, there is not even a
+ setup.py, manually set the shebang to the Debian standard.
+
+--- a/repo
++++ b/repo
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env python
++#!/usr/bin/python2
+ 
+ ## repo default configuration
+ ##
