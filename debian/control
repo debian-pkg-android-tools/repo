@@ -1,0 +1,34 @@
+Source: repo
+Section: devel
+Priority: extra
+Maintainer: Android tools Maintainer <android-tools-devel@lists.alioth.debian.org>
+Uploaders: Hans-Christoph Steiner <hans@eds.org>
+Build-Depends: debhelper (>= 9),
+               python-all (>= 2.6.6-3)
+Standards-Version: 3.9.6
+Homepage: https://source.android.com/source/developing.html
+Vcs-Git: https://alioth.debian.org/anonscm/git/android-tools/repo.git
+Vcs-Browser: https://anonscm.debian.org/gitweb/?p=android-tools/repo.git
+
+Package: repo
+Architecture: all
+Depends: git (>= 1.7.2),
+         gnupg,
+         python (>= 2.6.6-3),
+         ${misc:Depends}
+Description: repository management tool built on top of git
+ Repo is a repository management tool that we built on top of Git. Repo
+ unifies the many Git repositories when necessary, does the uploads to our
+ revision control system, and automates parts of the Android development
+ workflow. Repo is not meant to replace Git, only to make it easier to work
+ with Git in the context of Android. The repo command is an executable Python
+ script that you can put anywhere in your path. In working with the Android
+ source files, you will use Repo for across-network operations. For example,
+ with a single Repo command you can download files from multiple repositories
+ into your local working directory.
+ .
+ repo is an unusual tool because it downloads all of the python modules it
+ needs to run using GPG-signed git tags, and stores those files as part of the
+ project that it is working with.  So this package just provides the wrapper
+ script, which provides the GPG signing keys for verifying that the correct
+ python code was downloaded.
