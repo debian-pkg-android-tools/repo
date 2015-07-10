@@ -1,5 +1,5 @@
 repo (1.12.22-1) unstable; urgency=low
 
-  * Initial Release.
+  * Initial Release (Closes: #792014)
 
- -- Hans-Christoph Steiner <hans@eds.org>  Sat, 15 Mar 2014 20:50:46 -0400
+ -- Hans-Christoph Steiner <hans@eds.org>  Thu, 09 Jul 2015 23:37:57 -0700
