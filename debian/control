@@ -17,18 +17,18 @@ Depends: git (>= 1.7.2),
          ${python:Depends},
          ${misc:Depends}
 Description: repository management tool built on top of git
- Repo is a repository management tool that we built on top of Git. Repo
- unifies the many Git repositories when necessary, does the uploads to our
- revision control system, and automates parts of the Android development
- workflow. Repo is not meant to replace Git, only to make it easier to work
- with Git in the context of Android. The repo command is an executable Python
- script that you can put anywhere in your path. In working with the Android
- source files, you will use Repo for across-network operations. For example,
- with a single Repo command you can download files from multiple repositories
- into your local working directory.
+ Repo is a repository management tool that the Android developers built on top
+ of Git. Repo unifies the many Git repositories when necessary, does the
+ uploads to the Android revision control system, and automates parts of the
+ Android development workflow. Repo is not meant to replace Git, only to make
+ it easier to work with Git in the context of Android. The repo command is an
+ executable Python script that you can put anywhere in your path. In working
+ with the Android source files, you will use Repo for across-network
+ operations. For example, with a single Repo command you can download files
+ from multiple repositories into your local working directory.
  .
- repo is an unusual tool because it downloads all of the python modules it
- needs to run using GPG-signed git tags, and stores those files as part of the
- project that it is working with.  So this package just provides the wrapper
- script, which provides the GPG signing keys for verifying that the correct
- python code was downloaded.
+ repo is an unusual tool because it downloads all of its own Python modules
+ using GPG-signed git tags, and stores those files as part of the project that
+ it is working with.  So this package just provides the wrapper script, which
+ provides the GPG signing keys for verifying that the correct Python code was
+ downloaded.
