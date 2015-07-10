@@ -3,8 +3,7 @@ Section: devel
 Priority: extra
 Maintainer: Android tools Maintainer <android-tools-devel@lists.alioth.debian.org>
 Uploaders: Hans-Christoph Steiner <hans@eds.org>
-Build-Depends: debhelper (>= 9),
-               python-all (>= 2.6.6-3)
+Build-Depends: debhelper (>= 9)
 Standards-Version: 3.9.6
 Homepage: https://source.android.com/source/developing.html
 Vcs-Git: https://alioth.debian.org/anonscm/git/android-tools/repo.git
@@ -14,7 +13,8 @@ Package: repo
 Architecture: all
 Depends: git (>= 1.7.2),
          gnupg,
-         ${python:Depends},
+         python,
+         python-kerberos,
          ${misc:Depends}
 Description: repository management tool built on top of git
  Repo is a repository management tool that the Android developers built on top
