@@ -8,7 +8,7 @@ Description:
 +++ b/repo
 @@ -1,4 +1,4 @@
 -#!/usr/bin/env python
-+#!/usr/bin/python2
++#!/usr/bin/python
  
  ## repo default configuration
  ##
