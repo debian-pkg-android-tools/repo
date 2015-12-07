@@ -92,7 +92,10 @@ class _GitCall(object):
   def version(self):
     p = GitCommand(None, ['--version'], capture_stdout=True)
     if p.Wait() == 0:
-      return p.stdout.decode('utf-8')
+      if hasattr(p.stdout, 'decode'):
+        return p.stdout.decode('utf-8')
+      else:
+        return p.stdout
     return None
 
   def version_tuple(self):
@@ -263,6 +266,8 @@ class GitCommand(object):
         if not buf:
           s_in.remove(s)
           continue
+        if not hasattr(buf, 'encode'):
+          buf = buf.decode()
         if s.std_name == 'stdout':
           self.stdout += buf
         else:

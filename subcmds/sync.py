@@ -23,18 +23,26 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 
 from pyversion import is_python3
 if is_python3():
+  import http.cookiejar as cookielib
+  import urllib.error
   import urllib.parse
+  import urllib.request
   import xmlrpc.client
 else:
+  import cookielib
   import imp
+  import urllib2
   import urlparse
   import xmlrpclib
   urllib = imp.new_module('urllib')
+  urllib.error = urllib2
   urllib.parse = urlparse
+  urllib.request = urllib2
   xmlrpc = imp.new_module('xmlrpc')
   xmlrpc.client = xmlrpclib
 
@@ -57,7 +65,9 @@ except ImportError:
   multiprocessing = None
 
 from git_command import GIT, git_require
+from git_config import GetUrlCookieFile
 from git_refs import R_HEADS, HEAD
+import gitc_utils
 from project import Project
 from project import RemoteSpec
 from command import Command, MirrorSafeCommand
@@ -65,6 +75,7 @@ from error import RepoChangedException, GitError, ManifestParseError
 from project import SyncBuffer
 from progress import Progress
 from wrapper import Wrapper
+from manifest_xml import GitcManifest
 
 _ONE_DAY_S = 24 * 60 * 60
 
@@ -119,6 +130,11 @@ credentials.
 The -f/--force-broken option can be used to proceed with syncing
 other projects if a project sync fails.
 
+The --force-sync option can be used to overwrite existing git
+directories if they have previously been linked to a different
+object direcotry. WARNING: This may cause data to be lost since
+refs may be removed when overwriting.
+
 The --no-clone-bundle option disables any attempt to use
 $URL/clone.bundle to bootstrap a new Git repository from a
 resumeable bundle file on a content delivery network. This
@@ -130,6 +146,10 @@ of a project from server.
 
 The -c/--current-branch option can be used to only fetch objects that
 are on the branch specified by a project's revision.
+
+The --optimized-fetch option can be used to only fetch projects that
+are fixed to a sha1 revision if the sha1 revision does not already
+exist locally.
 
 SSH Connections
 ---------------
@@ -170,6 +190,11 @@ later is required to fix a server side protocol bug.
     p.add_option('-f', '--force-broken',
                  dest='force_broken', action='store_true',
                  help="continue sync even if a project fails to sync")
+    p.add_option('--force-sync',
+                 dest='force_sync', action='store_true',
+                 help="overwrite an existing git directory if it needs to "
+                      "point to a different object directory. WARNING: this "
+                      "may cause loss of data")
     p.add_option('-l', '--local-only',
                  dest='local_only', action='store_true',
                  help="only update working tree, don't fetch")
@@ -206,6 +231,9 @@ later is required to fix a server side protocol bug.
     p.add_option('--no-tags',
                  dest='no_tags', action='store_true',
                  help="don't fetch tags")
+    p.add_option('--optimized-fetch',
+                 dest='optimized_fetch', action='store_true',
+                 help='only fetch projects fixed to sha1 if revision does not exist locally')
     if show_smart:
       p.add_option('-s', '--smart-sync',
                    dest='smart_sync', action='store_true',
@@ -274,8 +302,10 @@ later is required to fix a server side protocol bug.
         success = project.Sync_NetworkHalf(
           quiet=opt.quiet,
           current_branch_only=opt.current_branch_only,
+          force_sync=opt.force_sync,
           clone_bundle=not opt.no_clone_bundle,
-          no_tags=opt.no_tags, archive=self.manifest.IsArchive)
+          no_tags=opt.no_tags, archive=self.manifest.IsArchive,
+          optimized_fetch=opt.optimized_fetch)
         self._fetch_times.Set(project, time.time() - start)
 
         # Lock around all the rest of the code, since printing, updating a set
@@ -295,7 +325,9 @@ later is required to fix a server side protocol bug.
         pm.update()
       except _FetchError:
         err_event.set()
-      except:
+      except Exception as e:
+        print('error: Cannot fetch %s (%s: %s)' \
+            % (project.name, type(e).__name__, str(e)), file=sys.stderr)
         err_event.set()
         raise
     finally:
@@ -509,6 +541,9 @@ later is required to fix a server side protocol bug.
       self.manifest.Override(opt.manifest_name)
 
     manifest_name = opt.manifest_name
+    smart_sync_manifest_name = "smart_sync_override.xml"
+    smart_sync_manifest_path = os.path.join(
+      self.manifest.manifestProject.worktree, smart_sync_manifest_name)
 
     if opt.smart_sync or opt.smart_tag:
       if not self.manifest.manifest_server:
@@ -530,19 +565,18 @@ later is required to fix a server side protocol bug.
           try:
             info = netrc.netrc()
           except IOError:
-            print('.netrc file does not exist or could not be opened',
-                  file=sys.stderr)
+            # .netrc file does not exist or could not be opened
+            pass
           else:
             try:
               parse_result = urllib.parse.urlparse(manifest_server)
               if parse_result.hostname:
-                username, _account, password = \
-                  info.authenticators(parse_result.hostname)
-            except TypeError:
-              # TypeError is raised when the given hostname is not present
-              # in the .netrc file.
-              print('No credentials found for %s in .netrc'
-                    % parse_result.hostname, file=sys.stderr)
+                auth = info.authenticators(parse_result.hostname)
+                if auth:
+                  username, _account, password = auth
+                else:
+                  print('No credentials found for %s in .netrc'
+                        % parse_result.hostname, file=sys.stderr)
             except netrc.NetrcParseError as e:
               print('Error parsing .netrc file: %s' % e, file=sys.stderr)
 
@@ -551,8 +585,12 @@ later is required to fix a server side protocol bug.
                                                     (username, password),
                                                     1)
 
+      transport = PersistentTransport(manifest_server)
+      if manifest_server.startswith('persistent-'):
+        manifest_server = manifest_server[len('persistent-'):]
+
       try:
-        server = xmlrpc.client.Server(manifest_server)
+        server = xmlrpc.client.Server(manifest_server, transport=transport)
         if opt.smart_sync:
           p = self.manifest.manifestProject
           b = p.GetBranch(p.CurrentBranch)
@@ -575,17 +613,16 @@ later is required to fix a server side protocol bug.
           [success, manifest_str] = server.GetManifest(opt.smart_tag)
 
         if success:
-          manifest_name = "smart_sync_override.xml"
-          manifest_path = os.path.join(self.manifest.manifestProject.worktree,
-                                       manifest_name)
+          manifest_name = smart_sync_manifest_name
           try:
-            f = open(manifest_path, 'w')
+            f = open(smart_sync_manifest_path, 'w')
             try:
               f.write(manifest_str)
             finally:
               f.close()
-          except IOError:
-            print('error: cannot write manifest to %s' % manifest_path,
+          except IOError as e:
+            print('error: cannot write manifest to %s:\n%s'
+                  % (smart_sync_manifest_path, e),
                   file=sys.stderr)
             sys.exit(1)
           self._ReloadManifest(manifest_name)
@@ -602,6 +639,13 @@ later is required to fix a server side protocol bug.
               % (self.manifest.manifest_server, e.errcode, e.errmsg),
               file=sys.stderr)
         sys.exit(1)
+    else:  # Not smart sync or smart tag mode
+      if os.path.isfile(smart_sync_manifest_path):
+        try:
+          os.remove(smart_sync_manifest_path)
+        except OSError as e:
+          print('error: failed to remove existing smart sync override manifest: %s' %
+                e, file=sys.stderr)
 
     rp = self.manifest.repoProject
     rp.PreSync()
@@ -615,7 +659,8 @@ later is required to fix a server side protocol bug.
     if not opt.local_only:
       mp.Sync_NetworkHalf(quiet=opt.quiet,
                           current_branch_only=opt.current_branch_only,
-                          no_tags=opt.no_tags)
+                          no_tags=opt.no_tags,
+                          optimized_fetch=opt.optimized_fetch)
 
     if mp.HasChanges:
       syncbuf = SyncBuffer(mp.config)
@@ -625,6 +670,42 @@ later is required to fix a server side protocol bug.
       self._ReloadManifest(manifest_name)
       if opt.jobs is None:
         self.jobs = self.manifest.default.sync_j
+
+    if self.gitc_manifest:
+      gitc_manifest_projects = self.GetProjects(args,
+                                                missing_ok=True)
+      gitc_projects = []
+      opened_projects = []
+      for project in gitc_manifest_projects:
+        if project.relpath in self.gitc_manifest.paths and \
+           self.gitc_manifest.paths[project.relpath].old_revision:
+          opened_projects.append(project.relpath)
+        else:
+          gitc_projects.append(project.relpath)
+
+      if not args:
+        gitc_projects = None
+
+      if gitc_projects != [] and not opt.local_only:
+        print('Updating GITC client: %s' % self.gitc_manifest.gitc_client_name)
+        manifest = GitcManifest(self.repodir, self.gitc_manifest.gitc_client_name)
+        if manifest_name:
+          manifest.Override(manifest_name)
+        else:
+          manifest.Override(self.manifest.manifestFile)
+        gitc_utils.generate_gitc_manifest(self.gitc_manifest,
+                                          manifest,
+                                          gitc_projects)
+        print('GITC client successfully synced.')
+
+      # The opened projects need to be synced as normal, therefore we
+      # generate a new args list to represent the opened projects.
+      # TODO: make this more reliable -- if there's a project name/path overlap,
+      # this may choose the wrong project.
+      args = [os.path.relpath(self.manifest.paths[p].worktree, os.getcwd())
+              for p in opened_projects]
+      if not args:
+        return
     all_projects = self.GetProjects(args,
                                     missing_ok=True,
                                     submodules_ok=opt.fetch_submodules)
@@ -678,7 +759,7 @@ later is required to fix a server side protocol bug.
     for project in all_projects:
       pm.update()
       if project.worktree:
-        project.Sync_LocalHalf(syncbuf)
+        project.Sync_LocalHalf(syncbuf, force_sync=opt.force_sync)
     pm.end()
     print(file=sys.stderr)
     if not syncbuf.Finish():
@@ -819,3 +900,100 @@ class _FetchTimes(object):
         os.remove(self._path)
       except OSError:
         pass
+
+# This is a replacement for xmlrpc.client.Transport using urllib2
+# and supporting persistent-http[s]. It cannot change hosts from
+# request to request like the normal transport, the real url
+# is passed during initialization.
+class PersistentTransport(xmlrpc.client.Transport):
+  def __init__(self, orig_host):
+    self.orig_host = orig_host
+
+  def request(self, host, handler, request_body, verbose=False):
+    with GetUrlCookieFile(self.orig_host, not verbose) as (cookiefile, proxy):
+      # Python doesn't understand cookies with the #HttpOnly_ prefix
+      # Since we're only using them for HTTP, copy the file temporarily,
+      # stripping those prefixes away.
+      if cookiefile:
+        tmpcookiefile = tempfile.NamedTemporaryFile()
+        tmpcookiefile.write("# HTTP Cookie File")
+        try:
+          with open(cookiefile) as f:
+            for line in f:
+              if line.startswith("#HttpOnly_"):
+                line = line[len("#HttpOnly_"):]
+              tmpcookiefile.write(line)
+          tmpcookiefile.flush()
+
+          cookiejar = cookielib.MozillaCookieJar(tmpcookiefile.name)
+          try:
+            cookiejar.load()
+          except cookielib.LoadError:
+            cookiejar = cookielib.CookieJar()
+        finally:
+          tmpcookiefile.close()
+      else:
+        cookiejar = cookielib.CookieJar()
+
+      proxyhandler = urllib.request.ProxyHandler
+      if proxy:
+        proxyhandler = urllib.request.ProxyHandler({
+            "http": proxy,
+            "https": proxy })
+
+      opener = urllib.request.build_opener(
+          urllib.request.HTTPCookieProcessor(cookiejar),
+          proxyhandler)
+
+      url = urllib.parse.urljoin(self.orig_host, handler)
+      parse_results = urllib.parse.urlparse(url)
+
+      scheme = parse_results.scheme
+      if scheme == 'persistent-http':
+        scheme = 'http'
+      if scheme == 'persistent-https':
+        # If we're proxying through persistent-https, use http. The
+        # proxy itself will do the https.
+        if proxy:
+          scheme = 'http'
+        else:
+          scheme = 'https'
+
+      # Parse out any authentication information using the base class
+      host, extra_headers, _ = self.get_host_info(parse_results.netloc)
+
+      url = urllib.parse.urlunparse((
+          scheme,
+          host,
+          parse_results.path,
+          parse_results.params,
+          parse_results.query,
+          parse_results.fragment))
+
+      request = urllib.request.Request(url, request_body)
+      if extra_headers is not None:
+        for (name, header) in extra_headers:
+          request.add_header(name, header)
+      request.add_header('Content-Type', 'text/xml')
+      try:
+        response = opener.open(request)
+      except urllib.error.HTTPError as e:
+        if e.code == 501:
+          # We may have been redirected through a login process
+          # but our POST turned into a GET. Retry.
+          response = opener.open(request)
+        else:
+          raise
+
+      p, u = xmlrpc.client.getparser()
+      while 1:
+        data = response.read(1024)
+        if not data:
+          break
+        p.feed(data)
+      p.close()
+      return u.close()
+
+  def close(self):
+    pass
+
