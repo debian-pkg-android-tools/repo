@@ -1,3 +1,10 @@
+repo (1.12.32-1) UNRELEASED; urgency=medium
+
+  * New upstream release
+  * Use get-orig-source to fetch upstream tarball
+
+ -- Kai-Chung Yan <seamlikok@gmail.com>  Mon, 07 Dec 2015 11:59:59 +0800
+
 repo (1.12.22-1) unstable; urgency=low
 
   * Initial Release (Closes: #792014)
