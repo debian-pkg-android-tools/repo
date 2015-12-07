@@ -31,20 +31,29 @@ else:
   urllib = imp.new_module('urllib')
   urllib.request = urllib2
 
+try:
+  import kerberos
+except ImportError:
+  kerberos = None
+
+from color import SetDefaultColoring
 from trace import SetTrace
 from git_command import git, GitCommand
 from git_config import init_ssh, close_ssh
 from command import InteractiveCommand
 from command import MirrorSafeCommand
+from command import GitcAvailableCommand, GitcClientCommand
 from subcmds.version import Version
 from editor import Editor
 from error import DownloadError
+from error import InvalidProjectGroupsError
 from error import ManifestInvalidRevisionError
 from error import ManifestParseError
 from error import NoManifestException
 from error import NoSuchProjectError
 from error import RepoChangedException
-from manifest_xml import XmlManifest
+import gitc_utils
+from manifest_xml import GitcManifest, XmlManifest
 from pager import RunPager
 from wrapper import WrapperPath, Wrapper
 
@@ -64,6 +73,9 @@ global_options.add_option('-p', '--paginate',
 global_options.add_option('--no-pager',
                           dest='no_pager', action='store_true',
                           help='disable the pager')
+global_options.add_option('--color',
+                          choices=('auto', 'always', 'never'), default=None,
+                          help='control color usage: auto, always, never')
 global_options.add_option('--trace',
                           dest='trace', action='store_true',
                           help='trace git command execution')
@@ -108,6 +120,8 @@ class _Repo(object):
         print('fatal: invalid usage of --version', file=sys.stderr)
         return 1
 
+    SetDefaultColoring(gopts.color)
+
     try:
       cmd = self.commands[name]
     except KeyError:
@@ -117,6 +131,12 @@ class _Repo(object):
 
     cmd.repodir = self.repodir
     cmd.manifest = XmlManifest(cmd.repodir)
+    cmd.gitc_manifest = None
+    gitc_client_name = gitc_utils.parse_clientdir(os.getcwd())
+    if gitc_client_name:
+      cmd.gitc_manifest = GitcManifest(cmd.repodir, gitc_client_name)
+      cmd.manifest.isGitcClient = True
+
     Editor.globalConfig = cmd.manifest.globalConfig
 
     if not isinstance(cmd, MirrorSafeCommand) and cmd.manifest.IsMirror:
@@ -124,8 +144,25 @@ class _Repo(object):
             file=sys.stderr)
       return 1
 
-    copts, cargs = cmd.OptionParser.parse_args(argv)
-    copts = cmd.ReadEnvironmentOptions(copts)
+    if isinstance(cmd, GitcAvailableCommand) and not gitc_utils.get_gitc_manifest_dir():
+      print("fatal: '%s' requires GITC to be available" % name,
+            file=sys.stderr)
+      return 1
+
+    if isinstance(cmd, GitcClientCommand) and not gitc_client_name:
+      print("fatal: '%s' requires a GITC client" % name,
+            file=sys.stderr)
+      return 1
+
+    try:
+      copts, cargs = cmd.OptionParser.parse_args(argv)
+      copts = cmd.ReadEnvironmentOptions(copts)
+    except NoManifestException as e:
+      print('error: in `%s`: %s' % (' '.join([name] + argv), str(e)),
+        file=sys.stderr)
+      print('error: manifest missing or unreadable -- please run init',
+            file=sys.stderr)
+      return 1
 
     if not gopts.no_pager and not isinstance(cmd, InteractiveCommand):
       config = cmd.manifest.globalConfig
@@ -141,21 +178,25 @@ class _Repo(object):
     start = time.time()
     try:
       result = cmd.Execute(copts, cargs)
-    except DownloadError as e:
-      print('error: %s' % str(e), file=sys.stderr)
-      result = 1
-    except ManifestInvalidRevisionError as e:
-      print('error: %s' % str(e), file=sys.stderr)
-      result = 1
-    except NoManifestException as e:
-      print('error: manifest required for this command -- please run init',
-            file=sys.stderr)
+    except (DownloadError, ManifestInvalidRevisionError,
+        NoManifestException) as e:
+      print('error: in `%s`: %s' % (' '.join([name] + argv), str(e)),
+        file=sys.stderr)
+      if isinstance(e, NoManifestException):
+        print('error: manifest missing or unreadable -- please run init',
+              file=sys.stderr)
       result = 1
     except NoSuchProjectError as e:
       if e.name:
         print('error: project %s not found' % e.name, file=sys.stderr)
       else:
         print('error: no project in current directory', file=sys.stderr)
+      result = 1
+    except InvalidProjectGroupsError as e:
+      if e.name:
+        print('error: project group must be enabled for project %s' % e.name, file=sys.stderr)
+      else:
+        print('error: project group must be enabled for the project in the current directory', file=sys.stderr)
       result = 1
     finally:
       elapsed = time.time() - start
@@ -332,6 +373,86 @@ class _DigestAuthHandler(urllib.request.HTTPDigestAuthHandler):
         self.retried = 0
       raise
 
+class _KerberosAuthHandler(urllib.request.BaseHandler):
+  def __init__(self):
+    self.retried = 0
+    self.context = None
+    self.handler_order = urllib.request.BaseHandler.handler_order - 50
+
+  def http_error_401(self, req, fp, code, msg, headers):
+    host = req.get_host()
+    retry = self.http_error_auth_reqed('www-authenticate', host, req, headers)
+    return retry
+
+  def http_error_auth_reqed(self, auth_header, host, req, headers):
+    try:
+      spn = "HTTP@%s" % host
+      authdata = self._negotiate_get_authdata(auth_header, headers)
+
+      if self.retried > 3:
+        raise urllib.request.HTTPError(req.get_full_url(), 401,
+          "Negotiate auth failed", headers, None)
+      else:
+        self.retried += 1
+
+      neghdr = self._negotiate_get_svctk(spn, authdata)
+      if neghdr is None:
+        return None
+
+      req.add_unredirected_header('Authorization', neghdr)
+      response = self.parent.open(req)
+
+      srvauth = self._negotiate_get_authdata(auth_header, response.info())
+      if self._validate_response(srvauth):
+        return response
+    except kerberos.GSSError:
+      return None
+    except:
+      self.reset_retry_count()
+      raise
+    finally:
+      self._clean_context()
+
+  def reset_retry_count(self):
+    self.retried = 0
+
+  def _negotiate_get_authdata(self, auth_header, headers):
+    authhdr = headers.get(auth_header, None)
+    if authhdr is not None:
+      for mech_tuple in authhdr.split(","):
+        mech, __, authdata = mech_tuple.strip().partition(" ")
+        if mech.lower() == "negotiate":
+          return authdata.strip()
+    return None
+
+  def _negotiate_get_svctk(self, spn, authdata):
+    if authdata is None:
+      return None
+
+    result, self.context = kerberos.authGSSClientInit(spn)
+    if result < kerberos.AUTH_GSS_COMPLETE:
+      return None
+
+    result = kerberos.authGSSClientStep(self.context, authdata)
+    if result < kerberos.AUTH_GSS_CONTINUE:
+      return None
+
+    response = kerberos.authGSSClientResponse(self.context)
+    return "Negotiate %s" % response
+
+  def _validate_response(self, authdata):
+    if authdata is None:
+      return None
+    result = kerberos.authGSSClientStep(self.context, authdata)
+    if result == kerberos.AUTH_GSS_COMPLETE:
+      return True
+    return None
+
+  def _clean_context(self):
+    if self.context is not None:
+      kerberos.authGSSClientClean(self.context)
+      self.context = None
+
 def init_http():
   handlers = [_UserAgentHandler()]
 
@@ -348,6 +469,8 @@ def init_http():
     pass
   handlers.append(_BasicAuthHandler(mgr))
   handlers.append(_DigestAuthHandler(mgr))
+  if kerberos:
+    handlers.append(_KerberosAuthHandler())
 
   if 'http_proxy' in os.environ:
     url = os.environ['http_proxy']

@@ -26,6 +26,7 @@ following DTD:
                         manifest-server?,
                         remove-project*,
                         project*,
+                        extend-project*,
                         repo-hooks?)>
 
     <!ELEMENT notice (#PCDATA)>
@@ -35,6 +36,7 @@ following DTD:
     <!ATTLIST remote alias        CDATA #IMPLIED>
     <!ATTLIST remote fetch        CDATA #REQUIRED>
     <!ATTLIST remote review       CDATA #IMPLIED>
+    <!ATTLIST remote revision     CDATA #IMPLIED>
 
     <!ELEMENT default (EMPTY)>
     <!ATTLIST default remote      IDREF #IMPLIED>
@@ -48,7 +50,9 @@ following DTD:
     <!ATTLIST url              CDATA #REQUIRED>
 
     <!ELEMENT project (annotation*,
-                       project*)>
+                       project*,
+                       copyfile?,
+                       linkfile?)>
     <!ATTLIST project name        CDATA #REQUIRED>
     <!ATTLIST project path        CDATA #IMPLIED>
     <!ATTLIST project remote      IDREF #IMPLIED>
@@ -65,6 +69,19 @@ following DTD:
     <!ATTLIST annotation name  CDATA #REQUIRED>
     <!ATTLIST annotation value CDATA #REQUIRED>
     <!ATTLIST annotation keep  CDATA "true">
+
+    <!ELEMENT copyfile (EMPTY)>
+    <!ATTLIST src value  CDATA #REQUIRED>
+    <!ATTLIST dest value CDATA #REQUIRED>
+
+    <!ELEMENT linkfile (EMPTY)>
+    <!ATTLIST src value  CDATA #REQUIRED>
+    <!ATTLIST dest value CDATA #REQUIRED>
+
+    <!ELEMENT extend-project>
+    <!ATTLIST extend-project name CDATA #REQUIRED>
+    <!ATTLIST extend-project path CDATA #IMPLIED>
+    <!ATTLIST extend-project groups CDATA #IMPLIED>
 
     <!ELEMENT remove-project (EMPTY)>
     <!ATTLIST remove-project name  CDATA #REQUIRED>
@@ -112,6 +129,10 @@ Attribute `review`: Hostname of the Gerrit server where reviews
 are uploaded to by `repo upload`.  This attribute is optional;
 if not specified then `repo upload` will not function.
 
+Attribute `revision`: Name of a Git branch (e.g. `master` or
+`refs/heads/master`). Remotes with their own revision will override
+the default revision.
+
 Element default
 ---------------
 
@@ -132,14 +153,14 @@ Project elements not setting their own `dest-branch` will inherit
 this value. If this value is not set, projects will use `revision`
 by default instead.
 
-Attribute `sync_j`: Number of parallel jobs to use when synching.
+Attribute `sync-j`: Number of parallel jobs to use when synching.
 
-Attribute `sync_c`: Set to true to only sync the given Git
+Attribute `sync-c`: Set to true to only sync the given Git
 branch (specified in the `revision` attribute) rather than the
-whole ref space.  Project elements lacking a sync_c element of
+whole ref space.  Project elements lacking a sync-c element of
 their own will use this value.
 
-Attribute `sync_s`: Set to true to also sync sub-projects.
+Attribute `sync-s`: Set to true to also sync sub-projects.
 
 
 Element manifest-server
@@ -208,7 +229,8 @@ to track for this project.  Names can be relative to refs/heads
 (e.g. just "master") or absolute (e.g. "refs/heads/master").
 Tags and/or explicit SHA-1s should work in theory, but have not
 been extensively tested.  If not supplied the revision given by
-the default element is used.
+the remote element is used if applicable, else the default
+element is used.
 
 Attribute `dest-branch`: Name of a Git branch (e.g. `master`).
 When using `repo upload`, changes will be submitted for code
@@ -226,13 +248,13 @@ group "notdefault", it will not be automatically downloaded by repo.
 If the project has a parent element, the `name` and `path` here
 are the prefixed ones.
 
-Attribute `sync_c`: Set to true to only sync the given Git
+Attribute `sync-c`: Set to true to only sync the given Git
 branch (specified in the `revision` attribute) rather than the
 whole ref space.
 
-Attribute `sync_s`: Set to true to also sync sub-projects.
+Attribute `sync-s`: Set to true to also sync sub-projects.
 
-Attribute `upstream`: Name of the Git branch in which a sha1
+Attribute `upstream`: Name of the Git ref in which a sha1
 can be found.  Used when syncing a revision locked manifest in
 -c mode to avoid having to sync the entire ref space.
 
@@ -246,6 +268,22 @@ rather than the `name` attribute.  This attribute only applies to the
 local mirrors syncing, it will be ignored when syncing the projects in a
 client working directory.
 
+Element extend-project
+----------------------
+
+Modify the attributes of the named project.
+
+This element is mostly useful in a local manifest file, to modify the
+attributes of an existing project without completely replacing the
+existing project definition.  This makes the local manifest more robust
+against changes to the original manifest.
+
+Attribute `path`: If specified, limit the change to projects checked out
+at the specified path, rather than all projects with the given name.
+
+Attribute `groups`: List of additional groups to which this project
+belongs.  Same syntax as the corresponding element of `project`.
+
 Element annotation
 ------------------
 
@@ -256,6 +294,21 @@ prefixed with REPO__.  In addition, there is an optional attribute
 "keep" which accepts the case insensitive values "true" (default) or
 "false".  This attribute determines whether or not the annotation will
 be kept when exported with the manifest subcommand.
+
+Element copyfile
+----------------
+
+Zero or more copyfile elements may be specified as children of a
+project element. Each element describes a src-dest pair of files;
+the "src" file will be copied to the "dest" place during 'repo sync'
+command.
+"src" is project relative, "dest" is relative to the top of the tree.
+
+Element linkfile
+----------------
+
+It's just like copyfile and runs at the same time as copyfile but
+instead of copying it creates a symlink.
 
 Element remove-project
 ----------------------

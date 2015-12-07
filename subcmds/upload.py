@@ -25,10 +25,12 @@ from git_command import GitCommand
 from project import RepoHook
 
 from pyversion import is_python3
+# pylint:disable=W0622
 if not is_python3():
-  # pylint:disable=W0622
   input = raw_input
-  # pylint:enable=W0622
+else:
+  unicode = str
+# pylint:enable=W0622
 
 UNUSUAL_COMMIT_THRESHOLD = 5
 
@@ -88,6 +90,11 @@ or global Git configuration option.  If review.URL.autoupload is set
 to "true" then repo will assume you always answer "y" at the prompt,
 and will not prompt you further.  If it is set to "false" then repo
 will assume you always answer "n", and will abort.
+
+review.URL.autoreviewer:
+
+To automatically append a user or mailing list to reviews, you can set
+a per-project or global Git option to do so.
 
 review.URL.autocopy:
 
@@ -293,14 +300,20 @@ Gerrit Code Review:  http://code.google.com/p/gerrit/
 
     self._UploadAndReport(opt, todo, people)
 
-  def _AppendAutoCcList(self, branch, people):
+  def _AppendAutoList(self, branch, people):
     """
+    Appends the list of reviewers in the git project's config.
     Appends the list of users in the CC list in the git project's config if a
     non-empty reviewer list was found.
     """
-
     name = branch.name
     project = branch.project
+
+    key = 'review.%s.autoreviewer' % project.GetBranch(name).remote.review
+    raw_list = project.config.GetString(key)
+    if not raw_list is None:
+      people[0].extend([entry.strip() for entry in raw_list.split(',')])
+
     key = 'review.%s.autocopy' % project.GetBranch(name).remote.review
     raw_list = project.config.GetString(key)
     if not raw_list is None and len(people[0]) > 0:
@@ -323,16 +336,20 @@ Gerrit Code Review:  http://code.google.com/p/gerrit/
     for branch in todo:
       try:
         people = copy.deepcopy(original_people)
-        self._AppendAutoCcList(branch, people)
+        self._AppendAutoList(branch, people)
 
         # Check if there are local changes that may have been forgotten
-        if branch.project.HasChanges():
+        changes = branch.project.UncommitedFiles()
+        if changes:
           key = 'review.%s.autoupload' % branch.project.remote.review
           answer = branch.project.config.GetBoolean(key)
 
           # if they want to auto upload, let's not ask because it could be automated
           if answer is None:
-            sys.stdout.write('Uncommitted changes in ' + branch.project.name + ' (did you forget to amend?). Continue uploading? (y/N) ')
+            sys.stdout.write('Uncommitted changes in ' + branch.project.name)
+            sys.stdout.write(' (did you forget to amend?):\n')
+            sys.stdout.write('\n'.join(changes) + '\n')
+            sys.stdout.write('Continue uploading? (y/N) ')
             a = sys.stdin.readline().strip().lower()
             if a not in ('y', 'yes', 't', 'true', 'on'):
               print("skipping upload", file=sys.stderr)

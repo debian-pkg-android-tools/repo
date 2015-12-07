@@ -24,6 +24,13 @@ class ManifestInvalidRevisionError(Exception):
 class NoManifestException(Exception):
   """The required manifest does not exist.
   """
+  def __init__(self, path, reason):
+    super(NoManifestException, self).__init__()
+    self.path = path
+    self.reason = reason
+
+  def __str__(self):
+    return self.reason
 
 class EditorError(Exception):
   """Unspecified error from the user's text editor.
@@ -73,7 +80,7 @@ class NoSuchProjectError(Exception):
     self.name = name
 
   def __str__(self):
-    if self.Name is None:
+    if self.name is None:
       return 'in current directory'
     return self.name
 
@@ -86,7 +93,7 @@ class InvalidProjectGroupsError(Exception):
     self.name = name
 
   def __str__(self):
-    if self.Name is None:
+    if self.name is None:
       return 'in current directory'
     return self.name
 
