@@ -1,3 +1,12 @@
+repo (1.12.32-2) unstable; urgency=medium
+
+  * add bash completion
+  * manpage based on output of `repo help --all` (Closes: #806546)
+  * document other sources of documentation
+  * remove obsolete section from README.source
+
+ -- Hans-Christoph Steiner <hans@eds.org>  Sun, 27 Dec 2015 23:25:16 +0100
+
 repo (1.12.32-1) unstable; urgency=medium
 
   * New upstream release
