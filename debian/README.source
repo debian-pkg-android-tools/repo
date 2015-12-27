@@ -5,26 +5,4 @@ Extra sources
 The bash completion file comes from:
 https://github.com/mbrubeck/android-completion/blob/5dd3c44717fbe840fad2b11a1f02c529a96a8e0d/repo
 
-Structure of the package's git repository
------------------------------------------
-
-The source code has been excerpted from the git repository
- https://gerrit.googlesource.com/git-repo
-
-The Android project does not release tarballs of their core software. This
-package source repo is configured following git-buildpackage's manual, under
-"When upstream uses GIT/No upstream tarballs":
-
-* http://honk.sigxcpu.org/projects/git-buildpackage/manual-html/gbp.import.html#GBP.IMPORT.UPSTREAM-GIT
-* file:///usr/share/doc/git-buildpackage/manual-html/gbp.import.html#GBP.IMPORT.UPSTREAM-GIT
-
-If you want to update the source git repo for this package to a newer release,
-then fetch the new commits from the upstream git repo:
-
- git remote add upstream https://gerrit.googlesource.com/git-repo
- git fetch upstream
-
-debian/gbp.conf is set up to use upstream's release branches and build
-tarballs from there.
-
  -- Hans-Christoph Steiner <hans@eds.org>, Mon,  6 Jul 2015 23:41:11 -0700
