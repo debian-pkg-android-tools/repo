@@ -1,0 +1,116 @@
+.TH repo 1 "26 Dec 2015" ".1" "tool for getting Android source"
+.SH NAME
+repo \- tool for getting Android source
+.SH SYNOPSIS
+\fBrepo\fR [ \fBcommand\fR ] [ \fBoptions \fR ]
+.SH DESCRIPTION
+\fBrepo\fR is a repository management tool that we built on top of
+Git. \fBrepo\fR unifies the many Git repositories when necessary, does
+the uploads to our revision control system, and automates parts of the
+Android development workflow. \fBrepo\fR is not meant to replace Git,
+only to make it easier to work with Git in the context of Android. The
+repo command is an executable Python script that you can put anywhere
+in your path. In working with the Android source files, you will use
+\fBrepo\fR for across-network operations. For example, with a single
+\fBrepo\fR command you can download files from multiple repositories
+into your local working directory.
+.PP
+The complete list of recognized repo commands are:
+.TP
+\fBabandon\fR
+Permanently abandon a development branch
+.TP
+\fBbranch\fR
+View current topic branches
+.TP
+\fBbranches\fR
+View current topic branches
+.TP
+\fBcheckout\fR
+Checkout a branch for development
+.TP
+\fBcherry-pick\fR
+Cherry-pick a change.
+.TP
+\fBdiff\fR
+Show changes between commit and working tree
+.TP
+\fBdiffmanifests\fR
+Manifest diff utility
+.TP
+\fBdownload\fR
+Download and checkout a change
+.TP
+\fBforall\fR
+Run a shell command in each project
+.TP
+\fBgitc-delete\fR
+Delete a GITC Client.
+.TP
+\fBgitc-init\fR
+Initialize a GITC Client.
+.TP
+\fBgrep\fR
+Print lines matching a pattern
+.TP
+\fBhelp\fR
+Display detailed help on a command
+.TP
+\fBinfo\fR
+Get info on the manifest branch, current branch or unmerged branches
+.TP
+\fBinit\fR
+Initialize repo in the current directory
+.TP
+\fBlist\fR
+List projects and their associated directories
+.TP
+\fBmanifest\fR
+Manifest inspection utility
+.TP
+\fBoverview\fR
+Display overview of unmerged project branches
+.TP
+\fBprune\fR
+Prune (delete) already merged topics
+.TP
+\fBrebase\fR
+Rebase local branches on upstream branch
+.TP
+\fBselfupdate\fR
+Update repo to the latest version
+.TP
+\fBsmartsync\fR
+Update working tree to the latest known good revision
+.TP
+\fBstage\fR
+Stage file(s) for commit
+.TP
+\fBstart\fR
+Start a new branch for development
+.TP
+\fBstatus\fR
+Show the working tree status
+.TP
+\fBsync\fR
+Update working tree to the latest revision
+.TP
+\fBupload\fR
+Upload changes for code review
+.TP
+\fBversion\fR
+Display the version of repo
+.TP
+See \fBrepo help\fR [ \fBcommand\fR ] for more information on a specific command.
+
+.SH More documentation
+There is more documentation on these websites:
+
+https://source.android.com/source/using-repo.html
+https://source.android.com/source/downloading.html
+https://source.android.com/source/developing.html
+
+.SH SEE ALSO
+git(1)
+.SH AUTHOR
+The Android Open Source Project, 2008-2015
