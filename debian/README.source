@@ -1,4 +1,10 @@
 
+Extra sources
+-------------
+
+The bash completion file comes from:
+https://github.com/mbrubeck/android-completion/blob/5dd3c44717fbe840fad2b11a1f02c529a96a8e0d/repo
+
 Structure of the package's git repository
 -----------------------------------------
 
