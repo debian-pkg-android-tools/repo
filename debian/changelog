@@ -1,3 +1,10 @@
+repo (1.12.37-1) unstable; urgency=medium
+
+  * New upstream release
+  * Standards-Version: 3.9.8
+
+ -- Hans-Christoph Steiner <hans@eds.org>  Sun, 18 Dec 2016 21:45:53 +0100
+
 repo (1.12.32-2) unstable; urgency=medium
 
   * add bash completion
