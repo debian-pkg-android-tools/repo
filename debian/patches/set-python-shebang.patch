@@ -10,5 +10,5 @@ Description:
 -#!/usr/bin/env python
 +#!/usr/bin/python
  
- ## repo default configuration
- ##
+ # repo default configuration
+ #
