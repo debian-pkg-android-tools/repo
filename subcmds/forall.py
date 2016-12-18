@@ -120,6 +120,9 @@ without iterating through the remaining projects.
     p.add_option('-r', '--regex',
                  dest='regex', action='store_true',
                  help="Execute the command only on projects matching regex or wildcard expression")
+    p.add_option('-i', '--inverse-regex',
+                 dest='inverse_regex', action='store_true',
+                 help="Execute the command only on projects not matching regex or wildcard expression")
     p.add_option('-g', '--groups',
                  dest='groups',
                  help="Execute the command only on projects matching the specified groups")
@@ -215,10 +218,12 @@ without iterating through the remaining projects.
     if os.path.isfile(smart_sync_manifest_path):
       self.manifest.Override(smart_sync_manifest_path)
 
-    if not opt.regex:
-      projects = self.GetProjects(args, groups=opt.groups)
-    else:
+    if opt.regex:
       projects = self.FindProjects(args)
+    elif opt.inverse_regex:
+      projects = self.FindProjects(args, inverse=True)
+    else:
+      projects = self.GetProjects(args, groups=opt.groups)
 
     os.environ['REPO_COUNT'] = str(len(projects))
 
@@ -240,7 +245,8 @@ without iterating through the remaining projects.
       rc = rc or errno.EINTR
     except Exception as e:
       # Catch any other exceptions raised
-      print('Got an error, terminating the pool: %r' % e,
+      print('Got an error, terminating the pool: %s: %s' %
+              (type(e).__name__, e),
             file=sys.stderr)
       pool.terminate()
       rc = rc or getattr(e, 'errno', 1)
@@ -254,7 +260,8 @@ without iterating through the remaining projects.
       try:
         project = self._SerializeProject(p)
       except Exception as e:
-        print('Project list error: %r' % e,
+        print('Project list error on project %s: %s: %s' %
+                (p.name, type(e).__name__, e),
               file=sys.stderr)
         return
       except KeyboardInterrupt:
