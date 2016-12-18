@@ -35,6 +35,7 @@ following DTD:
     <!ATTLIST remote name         ID    #REQUIRED>
     <!ATTLIST remote alias        CDATA #IMPLIED>
     <!ATTLIST remote fetch        CDATA #REQUIRED>
+    <!ATTLIST remote pushurl      CDATA #IMPLIED>
     <!ATTLIST remote review       CDATA #IMPLIED>
     <!ATTLIST remote revision     CDATA #IMPLIED>
 
@@ -47,12 +48,12 @@ following DTD:
     <!ATTLIST default sync-s      CDATA #IMPLIED>
 
     <!ELEMENT manifest-server (EMPTY)>
-    <!ATTLIST url              CDATA #REQUIRED>
+    <!ATTLIST manifest-server url CDATA #REQUIRED>
 
     <!ELEMENT project (annotation*,
                        project*,
-                       copyfile?,
-                       linkfile?)>
+                       copyfile*,
+                       linkfile*)>
     <!ATTLIST project name        CDATA #REQUIRED>
     <!ATTLIST project path        CDATA #IMPLIED>
     <!ATTLIST project remote      IDREF #IMPLIED>
@@ -71,14 +72,14 @@ following DTD:
     <!ATTLIST annotation keep  CDATA "true">
 
     <!ELEMENT copyfile (EMPTY)>
-    <!ATTLIST src value  CDATA #REQUIRED>
-    <!ATTLIST dest value CDATA #REQUIRED>
+    <!ATTLIST copyfile src  CDATA #REQUIRED>
+    <!ATTLIST copyfile dest CDATA #REQUIRED>
 
     <!ELEMENT linkfile (EMPTY)>
-    <!ATTLIST src value  CDATA #REQUIRED>
-    <!ATTLIST dest value CDATA #REQUIRED>
+    <!ATTLIST linkfile src CDATA #REQUIRED>
+    <!ATTLIST linkfile dest CDATA #REQUIRED>
 
-    <!ELEMENT extend-project>
+    <!ELEMENT extend-project (EMPTY)>
     <!ATTLIST extend-project name CDATA #REQUIRED>
     <!ATTLIST extend-project path CDATA #IMPLIED>
     <!ATTLIST extend-project groups CDATA #IMPLIED>
@@ -124,6 +125,12 @@ same remote name which actually points to different remote url.
 Attribute `fetch`: The Git URL prefix for all projects which use
 this remote.  Each project's name is appended to this prefix to
 form the actual URL used to clone the project.
+
+Attribute `pushurl`: The Git "push" URL prefix for all projects
+which use this remote.  Each project's name is appended to this
+prefix to form the actual URL used to "git push" the project.
+This attribute is optional; if not specified then "git push"
+will use the same URL as the `fetch` attribute.
 
 Attribute `review`: Hostname of the Gerrit server where reviews
 are uploaded to by `repo upload`.  This attribute is optional;
@@ -175,7 +182,8 @@ The manifest server should implement the following RPC methods:
   GetApprovedManifest(branch, target)
 
 Return a manifest in which each project is pegged to a known good revision
-for the current branch and target.
+for the current branch and target. This is used by repo sync when the
+--smart-sync option is given.
 
 The target to use is defined by environment variables TARGET_PRODUCT
 and TARGET_BUILD_VARIANT. These variables are used to create a string
@@ -187,7 +195,8 @@ should choose a reasonable default target.
   GetManifest(tag)
 
 Return a manifest in which each project is pegged to the revision at
-the specified tag.
+the specified tag. This is used by repo sync when the --smart-tag option
+is given.
 
 
 Element project
