@@ -6,7 +6,6 @@ include /usr/share/dpkg/pkg-info.mk
 	dh $@ --without python --without python2
 
 get-orig-source: v$(DEB_VERSION_UPSTREAM).tar.gz
-	mk-origtargz --repack --compression xz $<
 
 v$(DEB_VERSION_UPSTREAM).tar.gz:
 	wget https://android.googlesource.com/tools/repo/+archive/$@
