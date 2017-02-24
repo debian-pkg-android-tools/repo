@@ -1,5 +1,5 @@
 Source: repo
-Section: devel
+Section: contrib/devel
 Priority: extra
 Maintainer: Android tools Maintainer <android-tools-devel@lists.alioth.debian.org>
 Uploaders: Hans-Christoph Steiner <hans@eds.org>
