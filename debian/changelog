@@ -1,3 +1,9 @@
+repo (1.12.37-3) unstable; urgency=medium
+
+  * install bash-completion with debhelper (Closes: #856417)
+
+ -- Hans-Christoph Steiner <hans@eds.org>  Tue, 28 Feb 2017 21:51:18 +0100
+
 repo (1.12.37-2) unstable; urgency=medium
 
   * move to contrib, it violates policy 2.2.1 (Closes: #855846)
