@@ -3,7 +3,7 @@
 include /usr/share/dpkg/pkg-info.mk
 
 %:
-	dh $@ --without python --without python2
+	dh $@ --without python --without python2 --with bash-completion
 
 get-orig-source: v$(DEB_VERSION_UPSTREAM).tar.gz
 

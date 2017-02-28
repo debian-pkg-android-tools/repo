@@ -3,7 +3,7 @@ Section: contrib/devel
 Priority: extra
 Maintainer: Android tools Maintainer <android-tools-devel@lists.alioth.debian.org>
 Uploaders: Hans-Christoph Steiner <hans@eds.org>
-Build-Depends: debhelper (>= 9)
+Build-Depends: debhelper (>= 9), bash-completion
 Standards-Version: 3.9.8
 Homepage: https://source.android.com/source/developing.html
 Vcs-Git: https://alioth.debian.org/anonscm/git/android-tools/repo.git
